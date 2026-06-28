@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>AA 旅行记账</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- ====== 首页：行程列表 ====== -->
+  <div id="page-home">
+    <div class="header">
+      <h1>🧳 AA 旅行记账</h1>
+      <span style="font-size:13px;opacity:0.8" id="sync-badge"></span>
+    </div>
+    <div class="scroll-area" id="trip-list"></div>
+    <div class="bottom-bar">
+      <button class="btn btn-primary btn-block" onclick="showNewTrip()">＋ 新建行程</button>
+    </div>
+  </div>
+
+  <!-- ====== 行程详情页 ====== -->
+  <div id="page-trip" style="display:none">
+    <div class="header">
+      <button class="back-btn" onclick="goHome()">←</button>
+      <h1 id="trip-title">行程</h1>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff" onclick="showJoin()">＋加入</button>
+    </div>
+    <div class="scroll-area" id="expense-list"></div>
+    <div class="bottom-bar">
+      <button class="btn btn-primary" onclick="showAddExpense()" style="flex:1">💸 记一笔</button>
+      <button class="btn btn-outline" onclick="showSettle()" style="flex:1">🧮 看结算</button>
+    </div>
+  </div>
+
+  <!-- ====== 新建行程弹窗 ====== -->
+  <div id="modal-new-trip" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <h2>新建行程</h2>
+      <div class="form-group">
+        <label>行程名称</label>
+        <input type="text" id="input-trip-name" placeholder="比如：泰国7日游、周末露营…" autofocus />
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline btn-block" onclick="closeModal('modal-new-trip')">取消</button>
+        <button class="btn btn-primary btn-block" onclick="createTrip()">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 加入行程弹窗 ====== -->
+  <div id="modal-join" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <h2>加入行程</h2>
+      <div class="form-group">
+        <label>你的名字</label>
+        <input type="text" id="input-join-name" placeholder="输入你的名字" />
+      </div>
+      <div class="form-group">
+        <label style="font-weight:400;color:var(--text-secondary)">
+          已有成员：<span id="join-existing"></span>
+        </label>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline btn-block" onclick="closeModal('modal-join')">取消</button>
+        <button class="btn btn-primary btn-block" onclick="joinTrip()">加入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 记一笔弹窗 ====== -->
+  <div id="modal-expense" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <h2>💸 记一笔</h2>
+
+      <div class="form-group">
+        <label>货币</label>
+        <div class="currency-selector" id="currency-selector"></div>
+      </div>
+
+      <div class="form-group">
+        <label>金额 <span id="currency-hint" style="font-weight:400;color:var(--text-secondary);font-size:12px"></span></label>
+        <input type="number" id="input-amount" placeholder="0.00" step="0.01" min="0" inputmode="decimal" />
+      </div>
+
+      <div class="form-group">
+        <label>描述（可选）</label>
+        <input type="text" id="input-desc" placeholder="午餐、打车…" />
+      </div>
+
+      <div class="form-group">
+        <label>类别</label>
+        <div class="cat-grid" id="cat-grid"></div>
+      </div>
+
+      <div class="form-group">
+        <label>谁付的？</label>
+        <div class="people-list" id="payer-list"></div>
+      </div>
+
+      <div class="form-group">
+        <label>谁参与分摊？</label>
+        <div class="people-list" id="split-list"></div>
+      </div>
+
+      <div class="form-group">
+        <label>记录人</label>
+        <input type="text" id="input-creator" placeholder="你的名字" />
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline btn-block" onclick="closeModal('modal-expense')">取消</button>
+        <button class="btn btn-primary btn-block" onclick="addExpense()">✓ 记下</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Toast ====== -->
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

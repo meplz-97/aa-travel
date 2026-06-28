@@ -1,0 +1,13 @@
+{
+  "name": "aa-travel",
+  "version": "1.0.0",
+  "description": "旅行AA记账小程序 - 多人实时同步，简单好用",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.6.0",
+    "express": "^4.21.0"
+  }
+}

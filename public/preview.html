@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>与友同行明算账 — UI 方案预览</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f0f0;padding:16px}
+.intro{text-align:center;padding:24px 0;max-width:800px;margin:0 auto}
+.intro h1{font-size:28px;margin-bottom:8px}
+.intro p{color:#666;font-size:14px}
+.section{margin:24px auto;max-width:900px}
+.section-title{font-size:20px;font-weight:700;margin-bottom:12px;padding-left:4px;display:flex;align-items:center;gap:8px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:8px}
+.theme-card{border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+.theme-label{padding:8px 14px;font-size:12px;font-weight:600;text-align:center;letter-spacing:.5px}
+
+/* ====== 清新 V1: 薄荷绿 ====== */
+.t1{--bg:#F7FAF8;--card:#fff;--primary:#38A169;--primary-light:#E6FFEC;--text:#1a1a2e;--s:''}
+.c1{background:var(--bg);padding:12px}
+.c1 .phone{max-width:220px;margin:0 auto;background:var(--card);border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;gap:10px}
+.c1 .logo{text-align:center;font-size:28px}
+.c1 .t{font-size:16px;font-weight:800;color:var(--primary);text-align:center}
+.c1 .inp{width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:11px;background:#FAFAFA}
+.c1 .btn{width:100%;padding:8px;border-radius:8px;border:none;font-size:12px;font-weight:600;background:var(--primary);color:#fff;text-align:center}
+.c1 .exp{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee;font-size:10px}
+.c1 .exp .ico{width:24px;height:24px;border-radius:50%;background:#E6FFEC;text-align:center;line-height:24px;font-size:13px}
+.c1 .exp .amt{font-weight:700;margin-left:auto;font-size:11px}
+.c1 .set{display:flex;justify-content:space-between;align-items:center;padding:8px;background:#F7FAF8;border-radius:8px;font-size:10px}
+.c1 .set .arrow{margin:0 4px}
+
+/* ====== 清新 V2: 天蓝 ====== */
+.t2{--bg:#F4F8FC;--card:#fff;--primary:#3182CE;--primary-light:#EBF4FF;--text:#1a1a2e}
+
+/* ====== 清新 V3: 薰衣草 ====== */
+.t3{--bg:#F9F6FC;--card:#fff;--primary:#7C3AED;--primary-light:#F3EEFF;--text:#1a1a2e}
+
+/* ====== 简洁 V1: 极简线条 ====== */
+.t4{--bg:#FAFAFA;--card:#fff;--primary:#333;--primary-light:#f5f5f5;--text:#111}
+.c4 .inp{border:1px solid #ccc;border-radius:4px}
+.c4 .btn{border-radius:4px;font-weight:500}
+.c4 .exp{border-bottom:1px solid #eee}
+
+/* ====== 简洁 V2: 扁平无框 ====== */
+.t5{--bg:#fff;--card:transparent;--primary:#000;--primary-light:#f9f9f9;--text:#222}
+.c5 .inp{border:none;border-bottom:2px solid #ddd;border-radius:0}
+.c5 .btn{border-radius:0;font-weight:500}
+.c5 .exp{border-bottom:1px solid #f0f0f0}
+
+/* ====== 简洁 V3: 瑞士网格 ====== */
+.t6{--bg:#F5F5F3;--card:#fff;--primary:#E63946;--primary-light:#FFF5F5;--text:#1A1A1A}
+
+/* ====== 活泼 V1: 珊瑚暖阳 ====== */
+.t7{--bg:#FFF5F3;--card:#fff;--primary:#FF6B6B;--primary-light:#FFF0EE;--text:#2D1B1B}
+.c7 .btn{background:linear-gradient(135deg,#FF6B6B,#FF8E53)}
+.c7 .inp{border-color:#FFD4CC}
+
+/* ====== 活泼 V2: 梦幻渐变 ====== */
+.t8{--bg:#F8F4FF;--card:#fff;--primary:#7C3AED;--primary-light:#F3EEFF;--text:#1E0B3A}
+.c8 .btn{background:linear-gradient(135deg,#7C3AED,#EC4899)}
+.c8 .logo{font-size:28px;background:linear-gradient(135deg,#7C3AED,#EC4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+/* ====== 活泼 V3: 孟菲斯撞色 ====== */
+.t9{--bg:#FFF9DB;--card:#fff;--primary:#FF5722;--primary-light:#FFF3E0;--text:#1A1A2E}
+.c9 .inp{border:2px solid #333;border-radius:0}
+.c9 .btn{border-radius:0;background:#2196F3;font-weight:700}
+.c9 .cat{display:flex;gap:4px}
+.c9 .cat span{padding:2px 8px;border-radius:0;font-size:9px;font-weight:700}
+.c9 .cat span:nth-child(1){background:#FFEB3B;color:#333}
+.c9 .cat span:nth-child(2){background:#4CAF50;color:#fff}
+.c9 .cat span:nth-child(3){background:#2196F3;color:#fff}
+
+/* ====== 黑白 V1: 极致黑白 ====== */
+.t10{--bg:#fff;--card:#fff;--primary:#000;--primary-light:#f8f8f8;--text:#000}
+.c10 .btn{background:#000;color:#fff;border-radius:2px}
+.c10 .inp{border:1px solid #000;border-radius:2px}
+.c10 .exp{border-bottom:1px solid #000}
+
+/* ====== 黑白 V2: 暗夜模式 ====== */
+.t11{--bg:#111;--card:#1a1a1a;--primary:#fff;--primary-light:#222;--text:#eee}
+.c11{background:#111;color:#eee}
+.c11 .card,.c11 .phone{background:#1a1a1a;color:#eee}
+.c11 .btn{background:#fff;color:#000}
+.c11 .inp{background:#222;border-color:#333;color:#fff}
+.c11 .exp{border-bottom-color:#333}
+.c11 .set{background:#222}
+
+/* ====== 黑白 V3: 报纸质感 ====== */
+.t12{--bg:#F5F0E8;--card:#FAF6EF;--primary:#2C1810;--primary-light:#EDE4D8;--text:#2C1810}
+.c12 .btn{border-radius:0;font-family:Georgia,serif}
+.c12 .inp{border:1px solid #999;border-radius:0;background:#FDFAF4;font-family:Georgia,serif}
+.c12 .exp{border-bottom:1px dotted #999}
+.c12 .t{font-family:Georgia,serif;text-transform:uppercase;letter-spacing:2px}
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>与友同行明算账</h1>
+  <p>12 套 UI 方案 · 点击 you like 的告诉我编号</p>
+</div>
+
+<!-- 清新 -->
+<div class="section">
+  <div class="section-title">🍃 清新</div>
+  <div class="row">
+    <div class="theme-card t1" onclick="select('清新 V1')">
+      <div class="theme-label" style="background:#38A169;color:#fff">V1 · 薄荷绿</div>
+      <div class="c1"><div class="phone">
+        <div class="logo">🌿</div><div class="t">与友同行明算账</div>
+        <input class="inp" placeholder="昵称"><input class="inp" placeholder="密码" type="password">
+        <div class="btn">登录</div>
+        <div class="exp"><span class="ico">🍔</span><span>大阪烧肉<br><small>鸭鸭付·2人</small></span><span class="amt">¥350</span></div>
+        <div class="set"><span>🧮 清算时间</span><span>小红→小明 ¥150</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t2" onclick="select('清新 V2')">
+      <div class="theme-label" style="background:#3182CE;color:#fff">V2 · 天空蓝</div>
+      <div class="c1" style="--bg:#F4F8FC;--card:#fff;--primary:#3182CE;--primary-light:#EBF4FF"><div class="phone">
+        <div class="logo">☁️</div><div class="t" style="color:#3182CE">与友同行明算账</div>
+        <input class="inp" placeholder="昵称"><input class="inp" placeholder="密码" type="password">
+        <div class="btn" style="background:#3182CE">登录</div>
+        <div class="exp"><span class="ico" style="background:#EBF4FF">🍣</span><span>寿司午餐<br><small>路人丙付·3人</small></span><span class="amt">¥280</span></div>
+        <div class="set" style="background:#F4F8FC"><span>🧮 清算时间</span><span>测试鸭→鸭鸭 ¥804</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t3" onclick="select('清新 V3')">
+      <div class="theme-label" style="background:#7C3AED;color:#fff">V3 · 薰衣草</div>
+      <div class="c1" style="--bg:#F9F6FC;--card:#fff;--primary:#7C3AED;--primary-light:#F3EEFF"><div class="phone">
+        <div class="logo">💜</div><div class="t" style="color:#7C3AED">与友同行明算账</div>
+        <input class="inp" placeholder="昵称"><input class="inp" placeholder="密码" type="password">
+        <div class="btn" style="background:#7C3AED">登录</div>
+        <div class="exp"><span class="ico" style="background:#F3EEFF">🏨</span><span>民宿一晚<br><small>鸭鸭付·3人</small></span><span class="amt">¥1158</span></div>
+        <div class="set" style="background:#F9F6FC"><span>🧮 清算时间</span><span>路人丙→鸭鸭 ¥218</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 简洁 -->
+<div class="section">
+  <div class="section-title">📐 简洁</div>
+  <div class="row">
+    <div class="theme-card t4" onclick="select('简洁 V1')">
+      <div class="theme-label" style="background:#333;color:#fff">V1 · 极简线条</div>
+      <div class="c1 c4" style="--bg:#FAFAFA;--card:#fff;--primary:#333;--primary-light:#f5f5f5"><div class="phone">
+        <div class="logo" style="font-size:22px">💰</div><div class="t" style="color:#333;font-size:14px">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="border:1px solid #ccc;border-radius:4px"><input class="inp" placeholder="密码" type="password" style="border:1px solid #ccc;border-radius:4px">
+        <div class="btn" style="background:#333;border-radius:4px;font-weight:500">登录</div>
+        <div class="exp" style="border-bottom:1px solid #eee"><span>🍣</span><span style="font-size:10px">寿司 · 鸭鸭付</span><span class="amt" style="font-size:10px">¥350</span></div>
+        <div class="set" style="background:#fafafa;border-radius:4px;font-size:9px"><span>清算</span><span>小红→小明 ¥150</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t5" onclick="select('简洁 V2')">
+      <div class="theme-label" style="background:#000;color:#fff">V2 · 扁平无框</div>
+      <div class="c1 c5" style="--bg:#fff;--card:transparent;--primary:#000;--primary-light:#f9f9f9"><div class="phone" style="background:#fff;gap:14px">
+        <div class="logo" style="font-size:22px">💰</div><div class="t" style="color:#000;font-size:16px;font-weight:600">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="border:none;border-bottom:2px solid #ddd;border-radius:0;padding:10px 4px">
+        <input class="inp" placeholder="密码" type="password" style="border:none;border-bottom:2px solid #ddd;border-radius:0;padding:10px 4px">
+        <div class="btn" style="background:#000;border-radius:0">登录</div>
+        <div class="exp" style="border-bottom:1px solid #f0f0f0;padding:8px 0"><span>🍣</span><span style="font-size:10px">寿司</span><span class="amt" style="font-size:10px">¥350</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;padding:8px 0;border-bottom:2px solid #000"><span>清算</span><span>小红→小明 ¥150</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t6" onclick="select('简洁 V3')">
+      <div class="theme-label" style="background:#E63946;color:#fff">V3 · 瑞士网格</div>
+      <div class="c1" style="--bg:#F5F5F3;--card:#fff;--primary:#E63946;--primary-light:#FFF5F5"><div class="phone">
+        <div class="logo">▣</div><div class="t" style="color:#1A1A1A;font-family:Helvetica;font-weight:700;letter-spacing:1px">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="border:1px solid #000;border-radius:0"><input class="inp" placeholder="密码" type="password" style="border:1px solid #000;border-radius:0">
+        <div class="btn" style="background:#E63946;border-radius:0;font-family:Helvetica;font-weight:700">登录</div>
+        <div class="exp" style="border-bottom:2px solid #000"><span style="font-size:10px">🍣 寿司</span><span class="amt" style="font-size:10px;font-family:Helvetica">¥350</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;font-family:Helvetica;font-weight:700">
+          <span style="background:#000;color:#fff;padding:6px;text-align:center">清算</span><span style="border:2px solid #000;padding:6px;text-align:center">¥150</span>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 活泼 -->
+<div class="section">
+  <div class="section-title">🎨 活泼</div>
+  <div class="row">
+    <div class="theme-card t7" onclick="select('活泼 V1')">
+      <div class="theme-label" style="background:linear-gradient(135deg,#FF6B6B,#FF8E53);color:#fff">V1 · 珊瑚暖阳</div>
+      <div class="c1 c7" style="--bg:#FFF5F3"><div class="phone">
+        <div class="logo">☀️</div><div class="t" style="color:#FF6B6B">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="border-color:#FFD4CC"><input class="inp" placeholder="密码" type="password" style="border-color:#FFD4CC">
+        <div class="btn" style="background:linear-gradient(135deg,#FF6B6B,#FF8E53)">登录</div>
+        <div class="exp"><span class="ico" style="background:#FFF0EE">🌮</span><span>Taco晚餐<br><small>测试鸭付·2人</small></span><span class="amt" style="color:#FF6B6B">¥180</span></div>
+        <div class="set" style="background:#FFF5F3;border-left:3px solid #FF6B6B"><span>清算</span><span style="color:#FF6B6B">鸭鸭→测试鸭 ¥180</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t8" onclick="select('活泼 V2')">
+      <div class="theme-label" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:#fff">V2 · 梦幻渐变</div>
+      <div class="c1 c8" style="--bg:#F8F4FF"><div class="phone">
+        <div class="logo" style="background:linear-gradient(135deg,#7C3AED,#EC4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:28px">🌈</div>
+        <div class="t" style="background:linear-gradient(135deg,#7C3AED,#EC4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent">与友同行明算账</div>
+        <input class="inp" placeholder="昵称"><input class="inp" placeholder="密码" type="password">
+        <div class="btn" style="background:linear-gradient(135deg,#7C3AED,#EC4899)">登录</div>
+        <div class="exp"><span class="ico" style="background:linear-gradient(135deg,#F3EEFF,#FCE7F3)">🎫</span><span>卢浮宫门票<br><small>路人丙付·3人</small></span><span class="amt" style="color:#7C3AED">¥656</span></div>
+        <div class="set" style="background:linear-gradient(135deg,#F8F4FF,#FFF5FB);border-radius:12px"><span>清算</span><span style="color:#7C3AED">测试鸭→鸭鸭 ¥219</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t9" onclick="select('活泼 V3')">
+      <div class="theme-label" style="background:#FF5722;color:#fff">V3 · 孟菲斯撞色</div>
+      <div class="c1 c9" style="--bg:#FFF9DB"><div class="phone" style="border:3px solid #333">
+        <div class="logo">⚡</div><div class="t" style="color:#FF5722;font-family:Impact;letter-spacing:2px;font-size:14px">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="border:2px solid #333;border-radius:0"><input class="inp" placeholder="密码" type="password" style="border:2px solid #333;border-radius:0">
+        <div class="btn" style="background:#2196F3;border-radius:0;font-weight:700">登录</div>
+        <div class="exp" style="border-bottom:2px solid #333"><span style="font-size:10px">🍣 寿司</span><span class="amt" style="font-size:10px;color:#FF5722;font-family:Impact">¥350</span></div>
+        <div class="cat"><span>🍔餐饮</span><span>🏨住宿</span><span>🚌交通</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;padding:6px;background:#FFEB3B;font-weight:700">
+          <span>🧮 清算时间</span><span>小红→小明 ¥150</span>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 黑白 -->
+<div class="section">
+  <div class="section-title">🖤 黑白</div>
+  <div class="row">
+    <div class="theme-card t10" onclick="select('黑白 V1')">
+      <div class="theme-label" style="background:#000;color:#fff">V1 · 极致黑白</div>
+      <div class="c1 c10" style="--bg:#fff;--card:#fff;--primary:#000"><div class="phone" style="border:1px solid #000">
+        <div class="logo">◉</div><div class="t" style="color:#000;font-weight:700">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="border:1px solid #000;border-radius:2px"><input class="inp" placeholder="密码" type="password" style="border:1px solid #000;border-radius:2px">
+        <div class="btn" style="background:#000;color:#fff;border-radius:2px">登录</div>
+        <div class="exp" style="border-bottom:1px solid #000"><span style="font-size:10px">🍣 寿司</span><span class="amt" style="font-size:10px">¥350</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;padding:6px;border:1px solid #000;font-weight:600"><span>清算</span><span>¥150</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t11" onclick="select('黑白 V2')">
+      <div class="theme-label" style="background:#fff;color:#000;border:1px solid #333">V2 · 暗夜模式</div>
+      <div class="c1 c11"><div class="phone" style="background:#1a1a1a;color:#eee;border:1px solid #333">
+        <div class="logo">🌙</div><div class="t" style="color:#fff">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="background:#222;border-color:#333;color:#fff"><input class="inp" placeholder="密码" type="password" style="background:#222;border-color:#333;color:#fff">
+        <div class="btn" style="background:#fff;color:#000">登录</div>
+        <div class="exp" style="border-bottom-color:#333"><span style="font-size:10px;color:#ccc">🍣 寿司</span><span class="amt" style="font-size:10px;color:#fff">¥350</span></div>
+        <div class="set" style="background:#222;color:#ccc"><span>清算</span><span style="color:#fff">¥150</span></div>
+      </div></div>
+    </div>
+
+    <div class="theme-card t12" onclick="select('黑白 V3')">
+      <div class="theme-label" style="background:#2C1810;color:#F5F0E8">V3 · 报纸质感</div>
+      <div class="c1 c12"><div class="phone" style="background:#FAF6EF;border:1px solid #999;font-family:Georgia,serif">
+        <div class="logo" style="font-size:20px">📰</div><div class="t" style="font-family:Georgia,serif;letter-spacing:2px;font-size:13px;text-transform:uppercase">与友同行明算账</div>
+        <input class="inp" placeholder="昵称" style="border:1px solid #999;border-radius:0;background:#FDFAF4;font-family:Georgia,serif"><input class="inp" placeholder="密码" type="password" style="border:1px solid #999;border-radius:0;background:#FDFAF4;font-family:Georgia,serif">
+        <div class="btn" style="background:#2C1810;color:#F5F0E8;border-radius:0;font-family:Georgia,serif;letter-spacing:1px">登录</div>
+        <div class="exp" style="border-bottom:1px dotted #999"><span style="font-size:10px;font-family:Georgia">🍣 寿司</span><span class="amt" style="font-size:10px;font-family:Georgia">¥350</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;padding:6px;border:1px solid #999;font-family:Georgia"><span>清算时间</span><span>¥150</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<div id="picked" style="text-align:center;padding:24px;font-size:16px;color:#666;max-width:800px;margin:0 auto">👆 点击你喜欢的版本，告诉我编号</div>
+
+<script>
+function select(name) {
+  document.getElementById('picked').innerHTML = '✅ 已选择：<strong style="font-size:20px">' + name + '</strong><br><small style="color:#999">告诉我就按这个风格做～</small>';
+  document.getElementById('picked').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>

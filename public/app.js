@@ -1,20 +1,21 @@
 // ==================== 全局状态 ====================
+let token = localStorage.getItem('aa_token') || '';
+let myUser = null;
 let currentTripId = null;
 let currentTrip = null;
-let currentView = 'home';
+let currentView = 'login';
 let pollTimer = null;
 let lastSince = '';
 
 const CATEGORIES = [
-  { id: 'food', emoji: '🍔', label: '餐饮', color: '#FF6B6B' },
-  { id: 'transport', emoji: '🚌', label: '交通', color: '#4ECDC4' },
-  { id: 'hotel', emoji: '🏨', label: '住宿', color: '#A78BFA' },
-  { id: 'ticket', emoji: '🎫', label: '门票', color: '#FBBF24' },
-  { id: 'shopping', emoji: '🛍', label: '购物', color: '#F472B6' },
-  { id: 'other', emoji: '📦', label: '其他', color: '#9CA3AF' },
+  { id: 'food', emoji: '🍔', label: '餐饮' },
+  { id: 'transport', emoji: '🚌', label: '交通' },
+  { id: 'hotel', emoji: '🏨', label: '住宿' },
+  { id: 'ticket', emoji: '🎫', label: '门票' },
+  { id: 'shopping', emoji: '🛍', label: '购物' },
+  { id: 'other', emoji: '📦', label: '其他' },
 ];
 
-// 弹窗状态
 let selectedCategory = 'other';
 let selectedPayer = null;
 let selectedSplitIds = [];
@@ -22,7 +23,7 @@ let selectedCurrency = 'CNY';
 let exchangeRates = { CNY: 1 };
 let currencies = [];
 
-// ==================== 工具函数 ====================
+// ==================== 工具 ====================
 
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
@@ -42,34 +43,111 @@ function fmtTime(iso) {
 
 function toast(msg) {
   const el = $('#toast');
-  el.textContent = msg;
-  el.style.display = 'block';
-  el.style.animation = 'none';
-  el.offsetHeight;
+  el.textContent = msg; el.style.display = 'block';
+  el.style.animation = 'none'; el.offsetHeight;
   el.style.animation = 'fadeInOut 2s ease';
   setTimeout(() => { el.style.display = 'none'; }, 2000);
 }
+
+async function api(url, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(url, { headers, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (res.status === 401) { logout(); throw new Error('请重新登录'); }
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error || '请求失败');
+  }
+  return res.json();
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+// ==================== 视图 ====================
+
+function showView(view) {
+  currentView = view;
+  $('#page-login').style.display = view === 'login' ? 'flex' : 'none';
+  $('#page-home').style.display = view === 'home' ? 'block' : 'none';
+  $('#page-trip').style.display = view === 'trip' ? 'block' : 'none';
+}
+
+// ==================== 认证 ====================
+
+async function doRegister() {
+  const nickname = $('#login-nickname').value.trim();
+  const password = $('#login-password').value.trim();
+  if (!nickname) { $('#login-error').textContent = '请输入昵称'; return; }
+  if (!password) { $('#login-error').textContent = '请输入密码'; return; }
+  try {
+    const data = await api('/api/auth/register', { method: 'POST', body: { nickname, password } });
+    onLoginSuccess(data);
+  } catch (e) {
+    $('#login-error').textContent = e.message;
+  }
+}
+
+async function doLogin() {
+  const nickname = $('#login-nickname').value.trim();
+  const password = $('#login-password').value.trim();
+  if (!nickname || !password) { $('#login-error').textContent = '请输入昵称和密码'; return; }
+  try {
+    const data = await api('/api/auth/login', { method: 'POST', body: { nickname, password } });
+    onLoginSuccess(data);
+  } catch (e) {
+    $('#login-error').textContent = e.message;
+  }
+}
+
+function onLoginSuccess(data) {
+  token = data.token;
+  myUser = data.user;
+  localStorage.setItem('aa_token', token);
+  $('#login-error').textContent = '';
+  $('#my-nickname').textContent = myUser.nickname;
+  showView('home');
+  loadRates();
+  loadTrips();
+
+  // 登录后处理待加入的邀请
+  const pendingInvite = localStorage.getItem('aa_pending_invite');
+  if (pendingInvite) {
+    localStorage.removeItem('aa_pending_invite');
+    handleInvite(pendingInvite);
+  }
+}
+
+function logout() {
+  token = '';
+  myUser = null;
+  localStorage.removeItem('aa_token');
+  stopPolling();
+  $('#login-nickname').value = '';
+  $('#login-password').value = '';
+  showView('login');
+}
+
+// ==================== 汇率 ====================
 
 async function loadRates() {
   try {
     const data = await api('/api/rates');
     currencies = data.currencies;
-    for (const c of data.currencies) {
-      exchangeRates[c.code] = c.rate;
-    }
-    // 记住上次选的货币
+    for (const c of data.currencies) exchangeRates[c.code] = c.rate;
     const saved = localStorage.getItem('aa_currency');
     if (saved && exchangeRates[saved]) selectedCurrency = saved;
   } catch (_) {
-    // 使用默认汇率
     currencies = [{ code: 'CNY', symbol: '¥', name: '人民币', rate: 1 }];
   }
 }
 
 function renderCurrencySelector() {
-  if (currencies.length === 0) {
-    currencies = [{ code: 'CNY', symbol: '¥', name: '人民币', rate: 1 }];
-  }
+  if (currencies.length === 0) currencies = [{ code: 'CNY', symbol: '¥', name: '人民币', rate: 1 }];
   $('#currency-selector').innerHTML = currencies.map(c => `
     <div class="cur-option ${selectedCurrency === c.code ? 'selected' : ''}"
          onclick="selectCurrency('${c.code}')">
@@ -77,13 +155,8 @@ function renderCurrencySelector() {
       ${c.code !== 'CNY' ? `<span class="cur-rate">≈${c.rate.toFixed(4)}</span>` : ''}
     </div>
   `).join('');
-
   const cur = currencies.find(c => c.code === selectedCurrency);
-  if (cur && cur.code !== 'CNY') {
-    $('#currency-hint').textContent = `1 ${cur.code} ≈ ¥${cur.rate.toFixed(4)}`;
-  } else {
-    $('#currency-hint').textContent = '';
-  }
+  $('#currency-hint').textContent = (cur && cur.code !== 'CNY') ? `1 ${cur.code} ≈ ¥${cur.rate.toFixed(4)}` : '';
 }
 
 function selectCurrency(code) {
@@ -92,44 +165,6 @@ function selectCurrency(code) {
   renderCurrencySelector();
 }
 
-async function api(url, opts = {}) {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || '请求失败');
-  }
-  return res.json();
-}
-
-// ==================== 视图切换 ====================
-
-function showView(view) {
-  currentView = view;
-  $('#page-home').style.display = view === 'home' ? 'block' : 'none';
-  $('#page-trip').style.display = view === 'trip' ? 'block' : 'none';
-}
-
-function goHome() {
-  stopPolling();
-  currentTripId = null;
-  currentTrip = null;
-  showView('home');
-  loadTrips();
-}
-
-// ==================== 弹窗 ====================
-
-function openModal(id) { $('#' + id).style.display = 'flex'; }
-function closeModal(id) { $('#' + id).style.display = 'none'; }
-
-// ==================== Toast ====================
-
-// (toast function defined above)
-
 // ==================== 行程列表 ====================
 
 async function loadTrips() {
@@ -137,11 +172,7 @@ async function loadTrips() {
     const trips = await api('/api/trips');
     const container = $('#trip-list');
     if (trips.length === 0) {
-      container.innerHTML = `
-        <div class="empty">
-          <div class="icon">🧳</div>
-          <p>还没有行程<br>点击下方按钮创建一个吧~</p>
-        </div>`;
+      container.innerHTML = `<div class="empty"><div class="icon">🧳</div><p>还没有行程<br>点右下角 ＋ 创建一个吧~</p></div>`;
       return;
     }
     container.innerHTML = trips.map(t => `
@@ -154,9 +185,7 @@ async function loadTrips() {
         </div>
       </div>
     `).join('');
-  } catch (e) {
-    toast('加载失败：' + e.message);
-  }
+  } catch (e) { toast(e.message); }
 }
 
 function showNewTrip() {
@@ -172,35 +201,62 @@ async function createTrip() {
     const trip = await api('/api/trips', { method: 'POST', body: { name } });
     closeModal('modal-new-trip');
     toast('行程创建成功！');
-    loadTrips();
     openTrip(trip.id);
+  } catch (e) { toast(e.message); }
+}
+
+// ==================== 邀请 ====================
+
+async function showInvite() {
+  openModal('modal-invite');
+  $('#invite-url').textContent = '生成中…';
+  try {
+    const data = await api('/api/trips/' + currentTripId + '/invite', { method: 'POST' });
+    $('#invite-url').textContent = data.url;
   } catch (e) {
-    toast('创建失败：' + e.message);
+    $('#invite-url').textContent = '生成失败：' + e.message;
+  }
+}
+
+function copyInvite() {
+  const url = $('#invite-url').textContent;
+  if (!url || url.startsWith('生成')) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => toast('链接已复制！发给朋友吧'));
+  } else {
+    const ta = document.createElement('textarea'); ta.value = url;
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('链接已复制！');
   }
 }
 
 // ==================== 行程详情 ====================
 
-// 行程页骨架模板（被 settlement 覆盖后恢复用）
 const TRIP_SKELETON = `
   <div class="header">
     <button class="back-btn" onclick="goHome()">←</button>
     <h1 id="trip-title">行程</h1>
-    <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff" onclick="showJoin()">＋加入</button>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff" onclick="showInvite()">📤 邀请</button>
   </div>
   <div class="scroll-area" id="expense-list"></div>
   <div class="bottom-bar">
     <button class="btn btn-primary" onclick="showAddExpense()" style="flex:1">💸 记一笔</button>
-    <button class="btn btn-outline" onclick="showSettle()" style="flex:1">🧮 看结算</button>
+    <button class="btn" onclick="showSettle()" style="flex:1;background:var(--primary-dark);color:#fff">🧮 来A钱</button>
   </div>`;
+
+function goHome() {
+  stopPolling();
+  currentTripId = null;
+  currentTrip = null;
+  showView('home');
+  loadTrips();
+}
 
 async function openTrip(id) {
   currentTripId = id;
   showView('trip');
-  // 如果页面骨架被 settlement 覆盖，先恢复
-  if (!$('#trip-title')) {
-    $('#page-trip').innerHTML = TRIP_SKELETON;
-  }
+  if (!$('#trip-title')) $('#page-trip').innerHTML = TRIP_SKELETON;
   await loadTripDetail();
   startPolling();
 }
@@ -210,82 +266,49 @@ async function loadTripDetail(silent) {
     const trip = await api('/api/trips/' + currentTripId);
     currentTrip = trip;
 
-    // 如果在结算页，跳过 DOM 更新（页面元素已被替换）
     const titleEl = $('#trip-title');
     const listEl = $('#expense-list');
     if (!titleEl || !listEl) return;
 
     titleEl.textContent = trip.name;
 
-    if (trip.expenses.length === 0) {
-      $('#expense-list').innerHTML = `
-        <div class="empty">
-          <div class="icon">💸</div>
-          <p>还没有花费记录<br>点击下方「记一笔」开始记账吧</p>
-        </div>`;
+    if (trip.participants.length === 0) {
+      listEl.innerHTML = `<div class="empty"><div class="icon">👥</div><p>还没有参与者<br>点击右上角「邀请」分享给朋友</p></div>`;
+    } else if (trip.expenses.length === 0) {
+      listEl.innerHTML = `<div class="empty"><div class="icon">💸</div><p>还没有花费记录<br>点击下方「记一笔」开始记账吧</p></div>`;
     } else {
-      $('#expense-list').innerHTML = trip.expenses.map(e => {
+      listEl.innerHTML = trip.expenses.map(e => {
         const cat = CATEGORIES.find(c => c.id === e.category) || CATEGORIES[5];
         const perPerson = e.split_with.length > 0 ? (e.amount / e.split_with.length).toFixed(2) : '0';
         const showOriginal = e.currency && e.currency !== 'CNY';
         const curInfo = showOriginal
-          ? `<span style="font-size:11px;color:var(--text-secondary)">${e.currency} ${e.original_amount?.toFixed(2) || ''} · 汇率 ${e.exchange_rate?.toFixed(4) || ''}</span>`
+          ? `<span style="font-size:11px;color:var(--text-secondary)">${e.currency} ${e.original_amount?.toFixed(2)||''} · 汇率 ${e.exchange_rate?.toFixed(4)||''}</span>`
           : '';
         return `
         <div class="expense-item">
           <div class="cat-icon ${e.category}">${cat.emoji}</div>
           <div class="expense-info">
             <div class="desc">${escHtml(e.description || cat.label)}</div>
-            <div class="detail">${e.payer_name} 付 · ${e.split_names?.join('、') || '?'} 分摊</div>
+            <div class="detail">${e.payer_name} 付 · ${e.split_names?.join('、')||'?'} 分摊</div>
           </div>
           <div class="expense-amount">
             ¥${e.amount.toFixed(2)}
-            <div class="per">${curInfo ? curInfo + '<br>' : ''}人均 ¥${perPerson}</div>
+            <div class="per">${curInfo ? curInfo+'<br>' : ''}人均 ¥${perPerson}</div>
           </div>
           <button class="del-btn" onclick="deleteExpense(${e.id})" title="删除">×</button>
         </div>`;
       }).join('');
     }
-  } catch (e) {
-    if (!silent) toast('加载失败：' + e.message);
-  }
+  } catch (e) { if (!silent) toast(e.message); }
 }
 
-// ==================== 加入行程 ====================
-
-function showJoin() {
-  if (!currentTrip) return;
-  const names = currentTrip.participants.map(p => p.name).join('、') || '暂无';
-  $('#join-existing').textContent = names;
-  $('#input-join-name').value = localStorage.getItem('aa_creator_name') || '';
-  openModal('modal-join');
-  setTimeout(() => $('#input-join-name').focus(), 300);
-}
-
-async function joinTrip() {
-  const name = $('#input-join-name').value.trim();
-  if (!name) return toast('请输入名字');
-  try {
-    await api('/api/trips/' + currentTripId + '/join', { method: 'POST', body: { name } });
-    closeModal('modal-join');
-    toast('加入成功！');
-    localStorage.setItem('aa_creator_name', name);
-    loadTripDetail();
-  } catch (e) {
-    toast('加入失败：' + e.message);
-  }
-}
-
-// ==================== 添加花费 ====================
+// ==================== 记一笔 ====================
 
 function showAddExpense() {
-  if (!currentTrip || currentTrip.participants.length === 0) {
-    return toast('请先加入行程！');
-  }
+  if (!currentTrip || currentTrip.participants.length === 0) return toast('请先邀请朋友加入！');
 
   $('#input-amount').value = '';
   $('#input-desc').value = '';
-  $('#input-creator').value = localStorage.getItem('aa_creator_name') || '';
   selectedCategory = 'other';
   selectedPayer = currentTrip.participants[0]?.id || null;
   selectedSplitIds = currentTrip.participants.map(p => p.id);
@@ -345,34 +368,9 @@ async function addExpense() {
   const inputAmount = parseFloat($('#input-amount').value);
   if (!inputAmount || inputAmount <= 0) return toast('请输入有效金额');
 
-  const creatorName = $('#input-creator').value.trim();
-  if (!creatorName) return toast('请输入记录人名字');
-
-  // 计算货币转换
   const origAmount = Math.round(inputAmount * 100) / 100;
   const rate = exchangeRates[selectedCurrency] || 1;
   const rmbAmount = selectedCurrency === 'CNY' ? origAmount : Math.round(origAmount * rate * 100) / 100;
-
-  // 确保记录人在参与者列表中
-  let creatorInTrip = currentTrip.participants.find(p => p.name === creatorName);
-  if (!creatorInTrip) {
-    try {
-      creatorInTrip = await api('/api/trips/' + currentTripId + '/join', { method: 'POST', body: { name: creatorName } });
-      // 刷新本地缓存
-      await loadTripDetail(true);
-      // 更新选中状态
-      if (!selectedSplitIds.includes(creatorInTrip.id)) {
-        selectedSplitIds.push(creatorInTrip.id);
-      }
-    } catch (e) {
-      return toast('加入失败：' + e.message);
-    }
-  }
-
-  // 确保付款人在参与者列表中
-  if (!currentTrip.participants.find(p => p.id === selectedPayer)) {
-    return toast('付款人信息异常，请重新打开弹窗');
-  }
 
   try {
     await api('/api/trips/' + currentTripId + '/expenses', {
@@ -386,19 +384,13 @@ async function addExpense() {
         category: selectedCategory,
         payer_id: selectedPayer,
         split_with: selectedSplitIds,
-        creator_name: creatorName,
       },
     });
     closeModal('modal-expense');
-    localStorage.setItem('aa_creator_name', creatorName);
     toast('记账成功！');
     loadTripDetail();
-  } catch (e) {
-    toast('记失败：' + e.message);
-  }
+  } catch (e) { toast(e.message); }
 }
-
-// ==================== 删除花费 ====================
 
 async function deleteExpense(eid) {
   if (!confirm('确定删除这笔记录吗？')) return;
@@ -406,97 +398,133 @@ async function deleteExpense(eid) {
     await api('/api/trips/' + currentTripId + '/expenses/' + eid, { method: 'DELETE' });
     toast('已删除');
     loadTripDetail();
-  } catch (e) {
-    toast('删除失败：' + e.message);
-  }
+  } catch (e) { toast(e.message); }
 }
 
-// ==================== 结算 ====================
+// ==================== 来A钱（结算） ====================
 
 async function showSettle() {
   if (!currentTrip) return;
   try {
     const data = await api('/api/trips/' + currentTripId + '/settle');
-    const name = currentTrip.name;
 
-    let html = `<div class="header">
-      <button class="back-btn" onclick="openTrip(${currentTripId})">←</button>
-      <h1>🧮 结算</h1>
-      <span></span>
-    </div>`;
+    // 重置页面
+    $('#page-trip').innerHTML = `
+      <div class="header">
+        <button class="back-btn" onclick="openTrip(${currentTripId})">←</button>
+        <h1>🧮 来A钱</h1>
+        <span></span>
+      </div>
+      <div class="scroll-area" id="settle-content" style="padding-bottom:20px"></div>`;
 
-    // 汇总
+    let html = '';
+
+    // -- 汇总 --
     html += `<div style="padding:12px 16px">
       <div class="summary-grid">
-        <div class="summary-item">
-          <div class="s-amount">¥${data.summary.total.toFixed(2)}</div>
-          <div class="s-label">总花费</div>
-        </div>
-        <div class="summary-item">
-          <div class="s-amount">${data.transactions.length}</div>
-          <div class="s-label">需转账笔数</div>
-        </div>
+        <div class="summary-item"><div class="s-amount">¥${data.summary.total.toFixed(2)}</div><div class="s-label">总花费</div></div>
+        <div class="summary-item"><div class="s-amount">${data.transactions.length}</div><div class="s-label">需转账笔数</div></div>
       </div>
     </div>`;
 
-    // 分类汇总
+    // 分类
     if (Object.keys(data.summary.byCategory).length > 0) {
       html += `<div style="padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:8px">`;
       for (const [catId, amt] of Object.entries(data.summary.byCategory)) {
         const cat = CATEGORIES.find(c => c.id === catId) || CATEGORIES[5];
-        html += `<span style="background:${cat.color}15;color:${cat.color};padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600">${cat.emoji} ${cat.label} ¥${amt.toFixed(2)}</span>`;
+        html += `<span style="background:${cat.color || '#9CA3AF'}15;color:${cat.color||'#9CA3AF'};padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600">${cat.emoji} ${cat.label} ¥${amt.toFixed(2)}</span>`;
       }
       html += `</div>`;
     }
 
-    html += `<div class="scroll-area" style="padding-bottom:20px">`;
-
+    // -- 转账清单 --
     if (data.transactions.length === 0) {
-      html += `<div class="empty"><div class="icon">🎉</div><p>大家都平了！没有需要转账的~</p></div>`;
+      html += `<div class="empty"><div class="icon">🎉</div><p>大家都平了！</p></div>`;
     } else {
       html += data.transactions.map(t => `
         <div class="settle-card">
-          <div class="settle-info">
-            <strong>${escHtml(t.from)}</strong>
-            <span style="color:var(--text-secondary);font-size:13px"> 转账给 </span>
-            <strong>${escHtml(t.to)}</strong>
-          </div>
+          <div class="settle-info"><strong>${escHtml(t.from)}</strong> → <strong>${escHtml(t.to)}</strong></div>
           <div class="settle-amount">¥${t.amount.toFixed(2)}</div>
         </div>
       `).join('');
-    }
 
-    html += `</div>`;
-
-    // 复制按钮
-    if (data.transactions.length > 0) {
       const copyText = data.transactions.map(t => `${t.from} → ${t.to}：¥${t.amount.toFixed(2)}`).join('\n');
-      html += `<div style="padding:12px 16px">
-        <button class="btn btn-outline btn-block" onclick="copySettle(\`${escAttr(copyText)}\`)">📋 复制转账清单</button>
+      html += `<div style="padding:0 16px;margin-top:8px">
+        <button class="btn btn-outline btn-block" onclick="copyText(\`${copyText.replace(/`/g,'\\`')}\`)">📋 复制转账清单</button>
       </div>`;
     }
 
-    $('#page-trip').innerHTML = html;
-  } catch (e) {
-    toast('结算失败：' + e.message);
-  }
+    // -- 计算逻辑（可折叠） --
+    if (data.logic && data.logic.steps && data.logic.steps.length > 0) {
+      html += `<div class="logic-section">
+        <button class="logic-toggle" onclick="toggleLogic()">
+          📐 计算逻辑 <span style="font-size:12px">▾</span>
+        </button>
+        <div class="logic-body" id="logic-body">`;
+
+      // 每笔分摊
+      html += `<h4 style="margin:12px 0 8px;font-size:14px;color:var(--text-secondary)">📋 每笔花费分摊</h4>`;
+      for (const step of data.logic.steps) {
+        html += `<div class="step-item">
+          <strong>${escHtml(step.description)}</strong> · <span class="step-amount">¥${step.amount.toFixed(2)}</span><br>
+          <span class="step-payer">${escHtml(step.payer)}</span> 付款，
+          ${step.splitCount} 人分摊（${escHtml(step.splitPeople)}），
+          人均 <strong>¥${step.perPerson.toFixed(2)}</strong>
+        </div>`;
+      }
+
+      // 债务矩阵
+      html += `<h4 style="margin:12px 0 8px;font-size:14px;color:var(--text-secondary)">📊 债务矩阵（抵消前）</h4>`;
+      html += renderMatrix(data.logic.matrixBefore);
+
+      html += `<h4 style="margin:12px 0 8px;font-size:14px;color:var(--text-secondary)">📊 债务矩阵（抵消后）</h4>`;
+      html += renderMatrix(data.logic.matrixAfter);
+
+      html += `<p style="font-size:12px;color:var(--text-secondary);margin-top:8px">💡 抵消规则：如果 A 欠 B 100，B 也欠 A 30，则相抵后 A 只需给 B 70，减少不必要转账。</p>`;
+
+      html += `</div></div>`;
+    }
+
+    $('#settle-content').innerHTML = html;
+  } catch (e) { toast(e.message); }
 }
 
-function copySettle(text) {
+function renderMatrix(matrix) {
+  if (!matrix) return '<p style="color:var(--text-secondary);font-size:13px">无数据</p>';
+  const names = Object.keys(matrix);
+  if (names.length === 0) return '';
+  let h = '<div style="overflow-x:auto"><table class="matrix-table"><tr><th>欠 ↓ / 被欠 →</th>';
+  for (const n of names) h += `<th>${escHtml(n)}</th>`;
+  h += '</tr>';
+  for (const a of names) {
+    h += `<tr><td><strong>${escHtml(a)}</strong></td>`;
+    for (const b of names) {
+      const v = matrix[a]?.[b] || 0;
+      h += `<td class="${v === 0 ? 'zero' : ''}">${v > 0 ? '¥' + v.toFixed(2) : '0'}</td>`;
+    }
+    h += '</tr>';
+  }
+  h += '</table></div>';
+  return h;
+}
+
+function toggleLogic() {
+  const body = $('#logic-body');
+  if (body) body.classList.toggle('open');
+}
+
+function copyText(text) {
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(() => toast('已复制！'));
   } else {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    const ta = document.createElement('textarea'); ta.value = text;
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
     toast('已复制！');
   }
 }
 
-// ==================== 轮询同步 ====================
+// ==================== 轮询 ====================
 
 function startPolling() {
   stopPolling();
@@ -509,39 +537,78 @@ function stopPolling() {
 }
 
 async function pollUpdates() {
-  if (!currentTripId) return;
+  if (!currentTripId || currentView !== 'trip') return;
   try {
     const data = await api('/api/trips/' + currentTripId + '/poll?since=' + encodeURIComponent(lastSince));
-    if (data.expenses.length > 0 || data.participants.length > 0) {
+    if ((data.expenses && data.expenses.length > 0) || (data.participants && data.participants.length > 0)) {
       loadTripDetail(true);
-      $('#sync-badge').textContent = '🔄已同步';
-      setTimeout(() => { if (currentView === 'home') $('#sync-badge').textContent = ''; }, 2000);
     }
     if (data.since) lastSince = data.since;
-  } catch (_) { /* 静默失败 */ }
+  } catch (_) {}
 }
 
-// ==================== 辅助 ====================
+// ==================== 弹窗 ====================
 
-function escHtml(s) {
-  if (!s) return '';
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
-}
+function openModal(id) { $('#' + id).style.display = 'flex'; }
+function closeModal(id) { $('#' + id).style.display = 'none'; }
 
-function escAttr(s) {
-  return s.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) e.target.style.display = 'none';
+});
+
+// ==================== 邀请落地 ====================
+
+async function handleInvite(code) {
+  try {
+    const data = await api('/api/invite/' + code);
+    toast(`已加入「${data.name}」！`);
+    openTrip(data.trip_id);
+    // 清除 URL 中的 invite 路径
+    window.history.replaceState({}, '', '/');
+  } catch (e) { toast(e.message); }
 }
 
 // ==================== 初始化 ====================
 
-loadRates();
-loadTrips();
-
-// 点击弹窗遮罩关闭
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('modal-overlay')) {
-    e.target.style.display = 'none';
+(async function init() {
+  // 检查邀请链接
+  const match = location.pathname.match(/^\/invite\/(\w+)/);
+  if (match) {
+    if (token) {
+      showView('home');
+      await loadRates();
+      await handleInvite(match[1]);
+      return;
+    }
+    // 未登录，先登录再处理邀请
+    showView('login');
+    const origDoLogin = doLogin;
+    // 登录成功后自动处理邀请
+    const origSuccess = onLoginSuccess;
+    window._inviteCode = match[1];
+    // 简单方案：存储在 localStorage，登录后检测
+    localStorage.setItem('aa_pending_invite', match[1]);
+    history.replaceState({}, '', '/');
   }
-});
+
+  if (token) {
+    showView('home');
+    try {
+      myUser = await api('/api/auth/me');
+      $('#my-nickname').textContent = myUser.nickname;
+      await loadRates();
+      await loadTrips();
+
+      // 处理待加入的邀请
+      const pendingInvite = localStorage.getItem('aa_pending_invite');
+      if (pendingInvite) {
+        localStorage.removeItem('aa_pending_invite');
+        await handleInvite(pendingInvite);
+      }
+    } catch (e) {
+      logout();
+    }
+  } else {
+    showView('login');
+  }
+})();

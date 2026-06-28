@@ -95,6 +95,14 @@ app.get('/api/auth/me', auth, (req, res) => {
   res.json({ id: req.user.id, nickname: req.user.nickname });
 });
 
+// ==================== 管理 ====================
+
+app.get('/api/admin/users', auth, (req, res) => {
+  const db = getDb();
+  const users = db.prepare('SELECT id, nickname, created_at FROM users ORDER BY id').all();
+  res.json({ count: users.length, users });
+});
+
 // ==================== 汇率 ====================
 
 app.get('/api/rates', async (_req, res) => {

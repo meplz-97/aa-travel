@@ -181,9 +181,26 @@ async function createTrip() {
 
 // ==================== 行程详情 ====================
 
+// 行程页骨架模板（被 settlement 覆盖后恢复用）
+const TRIP_SKELETON = `
+  <div class="header">
+    <button class="back-btn" onclick="goHome()">←</button>
+    <h1 id="trip-title">行程</h1>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff" onclick="showJoin()">＋加入</button>
+  </div>
+  <div class="scroll-area" id="expense-list"></div>
+  <div class="bottom-bar">
+    <button class="btn btn-primary" onclick="showAddExpense()" style="flex:1">💸 记一笔</button>
+    <button class="btn btn-outline" onclick="showSettle()" style="flex:1">🧮 看结算</button>
+  </div>`;
+
 async function openTrip(id) {
   currentTripId = id;
   showView('trip');
+  // 如果页面骨架被 settlement 覆盖，先恢复
+  if (!$('#trip-title')) {
+    $('#page-trip').innerHTML = TRIP_SKELETON;
+  }
   await loadTripDetail();
   startPolling();
 }
@@ -192,7 +209,13 @@ async function loadTripDetail(silent) {
   try {
     const trip = await api('/api/trips/' + currentTripId);
     currentTrip = trip;
-    $('#trip-title').textContent = trip.name;
+
+    // 如果在结算页，跳过 DOM 更新（页面元素已被替换）
+    const titleEl = $('#trip-title');
+    const listEl = $('#expense-list');
+    if (!titleEl || !listEl) return;
+
+    titleEl.textContent = trip.name;
 
     if (trip.expenses.length === 0) {
       $('#expense-list').innerHTML = `

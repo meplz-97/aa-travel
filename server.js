@@ -294,7 +294,7 @@ app.get('/api/trips/:id/poll', auth, (req, res) => {
   res.json({ since: newSince, expenses: enriched, participants, deleted_ids: [] });
 });
 
-// ==================== 来A钱（结算） ====================
+// ==================== 清算时间（结算） ====================
 
 app.get('/api/trips/:id/settle', auth, (req, res) => {
   const db = getDb();
@@ -305,12 +305,14 @@ app.get('/api/trips/:id/settle', auth, (req, res) => {
   const expenses = db.prepare('SELECT * FROM expenses WHERE trip_id = ?').all(req.params.id);
 
   if (participants.length === 0) {
-    return res.json({ transactions: [], summary: { total: 0, byCategory: {} }, steps: [] });
+    return res.json({ transactions: [], summary: { total: 0, byCategory: {} }, details: {} });
   }
 
-  // 构建债务矩阵
   const debts = {};
   const nameMap = {};
+  // details: { "from_id→to_id": [{ description, amount, totalSplit, myShare, payer, category, creator_name, created_at }] }
+  const details = {};
+
   for (const p of participants) {
     debts[p.id] = {};
     nameMap[p.id] = p.name;
@@ -321,7 +323,6 @@ app.get('/api/trips/:id/settle', auth, (req, res) => {
 
   let totalSpent = 0;
   const byCategory = {};
-  const steps = []; // 记录计算过程
 
   for (const exp of expenses) {
     totalSpent += exp.amount;
@@ -332,33 +333,32 @@ app.get('/api/trips/:id/settle', auth, (req, res) => {
     if (splitIds.length === 0) continue;
 
     const perPerson = exp.amount / splitIds.length;
-
-    const splitNames = splitIds.map(sid => nameMap[sid] || '?').join('、');
-
-    steps.push({
-      description: exp.description || '未命名',
-      amount: exp.amount,
-      payer: nameMap[exp.payer_id] || '?',
-      splitCount: splitIds.length,
-      perPerson: Math.round(perPerson * 100) / 100,
-      splitPeople: splitNames,
-    });
+    const payerName = nameMap[exp.payer_id] || '?';
 
     for (const sid of splitIds) {
       if (sid === exp.payer_id) continue;
       debts[sid][exp.payer_id] += perPerson;
+
+      // 记录这笔花费的贡献明细
+      const key = `${sid}→${exp.payer_id}`;
+      if (!details[key]) details[key] = [];
+      details[key].push({
+        description: exp.description || '未命名',
+        category: exp.category,
+        amount: exp.amount,
+        payer: payerName,
+        splitCount: splitIds.length,
+        myShare: Math.round(perPerson * 100) / 100,
+        creator_name: exp.creator_name,
+        created_at: exp.created_at,
+        currency: exp.currency,
+        original_amount: exp.original_amount,
+        exchange_rate: exp.exchange_rate,
+      });
     }
   }
 
-  // 抵消
-  const matrixBefore = {};
-  for (const a of participants) {
-    matrixBefore[nameMap[a.id]] = {};
-    for (const b of participants) {
-      matrixBefore[nameMap[a.id]][nameMap[b.id]] = Math.round(debts[a.id][b.id] * 100) / 100;
-    }
-  }
-
+  // 抵消双向债务
   for (const a of participants) {
     for (const b of participants) {
       if (a.id >= b.id) continue;
@@ -367,18 +367,29 @@ app.get('/api/trips/:id/settle', auth, (req, res) => {
       if (ab > ba) {
         debts[a.id][b.id] = ab - ba;
         debts[b.id][a.id] = 0;
+        // 合并 details：a→b 保留，b→a 标记为抵消
+        const abKey = `${a.id}→${b.id}`;
+        const baKey = `${b.id}→${a.id}`;
+        if (details[abKey] && details[baKey]) {
+          details[abKey] = [
+            ...details[abKey],
+            { _offset: true, description: '抵消', amount: Math.round(ba * 100) / 100, from: nameMap[b.id] },
+          ];
+          delete details[baKey];
+        }
       } else {
         debts[b.id][a.id] = ba - ab;
         debts[a.id][b.id] = 0;
+        const abKey = `${a.id}→${b.id}`;
+        const baKey = `${b.id}→${a.id}`;
+        if (details[abKey] && details[baKey]) {
+          details[baKey] = [
+            ...details[baKey],
+            { _offset: true, description: '抵消', amount: Math.round(ab * 100) / 100, from: nameMap[a.id] },
+          ];
+          delete details[abKey];
+        }
       }
-    }
-  }
-
-  const matrixAfter = {};
-  for (const a of participants) {
-    matrixAfter[nameMap[a.id]] = {};
-    for (const b of participants) {
-      matrixAfter[nameMap[a.id]][nameMap[b.id]] = Math.round(debts[a.id][b.id] * 100) / 100;
     }
   }
 
@@ -388,10 +399,12 @@ app.get('/api/trips/:id/settle', auth, (req, res) => {
     for (const toId in debts[fromId]) {
       const amt = Math.round(debts[fromId][toId] * 100) / 100;
       if (amt > 0.01) {
+        const key = `${fromId}→${toId}`;
         transactions.push({
           from: nameMap[fromId], from_id: Number(fromId),
           to: nameMap[toId], to_id: Number(toId),
           amount: amt,
+          items: details[key] || [],
         });
       }
     }
@@ -400,11 +413,6 @@ app.get('/api/trips/:id/settle', auth, (req, res) => {
   res.json({
     transactions,
     summary: { total: Math.round(totalSpent * 100) / 100, byCategory },
-    logic: {
-      steps,
-      matrixBefore,
-      matrixAfter,
-    },
   });
 });
 
@@ -416,5 +424,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`💰 来A钱 已启动 → ${BASE_URL}`);
+  console.log(`💰 与友同行明算账 已启动 → ${BASE_URL}`);
 });

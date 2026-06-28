@@ -242,7 +242,7 @@ const TRIP_SKELETON = `
   <div class="scroll-area" id="expense-list"></div>
   <div class="bottom-bar">
     <button class="btn btn-primary" onclick="showAddExpense()" style="flex:1">💸 记一笔</button>
-    <button class="btn" onclick="showSettle()" style="flex:1;background:var(--primary-dark);color:#fff">🧮 来A钱</button>
+    <button class="btn" onclick="showSettle()" style="flex:1;background:var(--primary-dark);color:#fff">🧮 清算时间</button>
   </div>`;
 
 function goHome() {
@@ -290,6 +290,7 @@ async function loadTripDetail(silent) {
           <div class="expense-info">
             <div class="desc">${escHtml(e.description || cat.label)}</div>
             <div class="detail">${e.payer_name} 付 · ${e.split_names?.join('、')||'?'} 分摊</div>
+            <div class="detail" style="font-size:11px">${escHtml(e.creator_name||'')} 记录 · ${fmtTime(e.created_at)}</div>
           </div>
           <div class="expense-amount">
             ¥${e.amount.toFixed(2)}
@@ -401,18 +402,17 @@ async function deleteExpense(eid) {
   } catch (e) { toast(e.message); }
 }
 
-// ==================== 来A钱（结算） ====================
+// ==================== 清算时间（结算） ====================
 
 async function showSettle() {
   if (!currentTrip) return;
   try {
     const data = await api('/api/trips/' + currentTripId + '/settle');
 
-    // 重置页面
     $('#page-trip').innerHTML = `
       <div class="header">
         <button class="back-btn" onclick="openTrip(${currentTripId})">←</button>
-        <h1>🧮 来A钱</h1>
+        <h1>🧮 清算时间</h1>
         <span></span>
       </div>
       <div class="scroll-area" id="settle-content" style="padding-bottom:20px"></div>`;
@@ -432,7 +432,7 @@ async function showSettle() {
       html += `<div style="padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:8px">`;
       for (const [catId, amt] of Object.entries(data.summary.byCategory)) {
         const cat = CATEGORIES.find(c => c.id === catId) || CATEGORIES[5];
-        html += `<span style="background:${cat.color || '#9CA3AF'}15;color:${cat.color||'#9CA3AF'};padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600">${cat.emoji} ${cat.label} ¥${amt.toFixed(2)}</span>`;
+        html += `<span style="background:#f0f0f0;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600">${cat.emoji} ${cat.label} ¥${amt.toFixed(2)}</span>`;
       }
       html += `</div>`;
     }
@@ -441,12 +441,45 @@ async function showSettle() {
     if (data.transactions.length === 0) {
       html += `<div class="empty"><div class="icon">🎉</div><p>大家都平了！</p></div>`;
     } else {
-      html += data.transactions.map(t => `
-        <div class="settle-card">
-          <div class="settle-info"><strong>${escHtml(t.from)}</strong> → <strong>${escHtml(t.to)}</strong></div>
-          <div class="settle-amount">¥${t.amount.toFixed(2)}</div>
+      html += data.transactions.map((t, i) => {
+        const hasItems = t.items && t.items.length > 0;
+        return `
+        <div class="settle-card settle-clickable" onclick="toggleSettleDetail(${i})" style="cursor:pointer">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div class="settle-info"><strong>${escHtml(t.from)}</strong> → <strong>${escHtml(t.to)}</strong></div>
+              <div class="settle-amount">¥${t.amount.toFixed(2)}</div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">
+              ${hasItems ? '<span class="settle-expand-hint">点击查看明细 ▾</span>' : ''}
+            </div>
+          </div>
         </div>
-      `).join('');
+        ${hasItems ? `
+        <div class="settle-detail" id="settle-detail-${i}" style="display:none;margin:0 16px 8px">
+          ${t.items.map(item => {
+            if (item._offset) {
+              return `<div class="step-item" style="font-size:13px;color:var(--text-secondary);border-left:3px solid #ccc">
+                ↳ ${escHtml(item.from)} 也有付钱：<strong>¥${item.amount.toFixed(2)}</strong>（已抵消）
+              </div>`;
+            }
+            const cat = CATEGORIES.find(c => c.id === item.category) || CATEGORIES[5];
+            const showOrig = item.currency && item.currency !== 'CNY';
+            const origStr = showOrig ? ` (${item.currency} ${item.original_amount?.toFixed(2)||''})` : '';
+            return `<div class="step-item">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span>${cat.emoji}</span>
+                <strong>${escHtml(item.description)}</strong>
+                <span class="step-amount">¥${item.amount.toFixed(2)}${origStr}</span>
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">
+                ${escHtml(item.payer)} 付 · ${item.splitCount}人分摊 · 你应付 <strong>¥${item.myShare.toFixed(2)}</strong>
+                <span style="margin-left:8px">${escHtml(item.creator_name||'')} 记 · ${fmtTime(item.created_at)}</span>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>` : ''}`;
+      }).join('');
 
       const copyText = data.transactions.map(t => `${t.from} → ${t.to}：¥${t.amount.toFixed(2)}`).join('\n');
       html += `<div style="padding:0 16px;margin-top:8px">
@@ -454,63 +487,13 @@ async function showSettle() {
       </div>`;
     }
 
-    // -- 计算逻辑（可折叠） --
-    if (data.logic && data.logic.steps && data.logic.steps.length > 0) {
-      html += `<div class="logic-section">
-        <button class="logic-toggle" onclick="toggleLogic()">
-          📐 计算逻辑 <span style="font-size:12px">▾</span>
-        </button>
-        <div class="logic-body" id="logic-body">`;
-
-      // 每笔分摊
-      html += `<h4 style="margin:12px 0 8px;font-size:14px;color:var(--text-secondary)">📋 每笔花费分摊</h4>`;
-      for (const step of data.logic.steps) {
-        html += `<div class="step-item">
-          <strong>${escHtml(step.description)}</strong> · <span class="step-amount">¥${step.amount.toFixed(2)}</span><br>
-          <span class="step-payer">${escHtml(step.payer)}</span> 付款，
-          ${step.splitCount} 人分摊（${escHtml(step.splitPeople)}），
-          人均 <strong>¥${step.perPerson.toFixed(2)}</strong>
-        </div>`;
-      }
-
-      // 债务矩阵
-      html += `<h4 style="margin:12px 0 8px;font-size:14px;color:var(--text-secondary)">📊 债务矩阵（抵消前）</h4>`;
-      html += renderMatrix(data.logic.matrixBefore);
-
-      html += `<h4 style="margin:12px 0 8px;font-size:14px;color:var(--text-secondary)">📊 债务矩阵（抵消后）</h4>`;
-      html += renderMatrix(data.logic.matrixAfter);
-
-      html += `<p style="font-size:12px;color:var(--text-secondary);margin-top:8px">💡 抵消规则：如果 A 欠 B 100，B 也欠 A 30，则相抵后 A 只需给 B 70，减少不必要转账。</p>`;
-
-      html += `</div></div>`;
-    }
-
     $('#settle-content').innerHTML = html;
   } catch (e) { toast(e.message); }
 }
 
-function renderMatrix(matrix) {
-  if (!matrix) return '<p style="color:var(--text-secondary);font-size:13px">无数据</p>';
-  const names = Object.keys(matrix);
-  if (names.length === 0) return '';
-  let h = '<div style="overflow-x:auto"><table class="matrix-table"><tr><th>欠 ↓ / 被欠 →</th>';
-  for (const n of names) h += `<th>${escHtml(n)}</th>`;
-  h += '</tr>';
-  for (const a of names) {
-    h += `<tr><td><strong>${escHtml(a)}</strong></td>`;
-    for (const b of names) {
-      const v = matrix[a]?.[b] || 0;
-      h += `<td class="${v === 0 ? 'zero' : ''}">${v > 0 ? '¥' + v.toFixed(2) : '0'}</td>`;
-    }
-    h += '</tr>';
-  }
-  h += '</table></div>';
-  return h;
-}
-
-function toggleLogic() {
-  const body = $('#logic-body');
-  if (body) body.classList.toggle('open');
+function toggleSettleDetail(i) {
+  const el = document.getElementById('settle-detail-' + i);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function copyText(text) {
